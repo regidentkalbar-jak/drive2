@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catatan Berkas Pendaftaran</title>
+  <link rel="manifest" href="manifest.json">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold text-white" href="#">
+        <i class="fas fa-car me-2"></i>Catatan Berkas Pendaftaran
+      </a>
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item"><a class="nav-link active" href="#formData">Entri Data</a></li>
+        <li class="nav-item"><a class="nav-link" href="#tabelData">Daftar Catatan</a></li>
+        <li class="nav-item"><a class="nav-link" href="#rekapan">Rekapan</a></li>
+      </ul>
+    </div>
+  </nav>
+  <section id="formData" class="container my-4">
+    <div class="card shadow">
+      <div class="card-header bg-success text-white">
+        <i class="fas fa-edit me-2"></i>Entri Data Kendaraan
+      </div>
+      <div class="card-body">
+        <form id="berkasForm" class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Tanggal</label>
+            <input type="date" class="form-control" id="tanggalMasuk" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">NRKB</label>
+            <input type="text" class="form-control" id="nrkb" placeholder="KB 8899 QQ" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Nama Pemilik</label>
+            <input type="text" class="form-control" id="namaPemilik" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Nomor Rangka</label>
+            <input type="text" class="form-control" id="nomorRangka" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Nomor BPKB</label>
+            <input type="text" class="form-control" id="noBpkb" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Tanggal Jatuh Tempo PKB</label>
+            <input type="date" class="form-control" id="tanggalJatuhTempo" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Jumlah PKB (Rp)</label>
+            <input type="text" class="form-control" id="jumlahPkb" placeholder="500.000" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Proses</label>
+            <select class="form-select" id="proses">
+              <option>Perpanjangan STNK</option>
+              <option>BBN2</option>
+              <option>Rubentina</option>
+              <option>Mutasi Keluar</option>
+              <option>Mutasi Masuk</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="fas fa-save me-2"></i>Simpan Catatan
+            </button>
+          </div>
+        </form>
+        <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-success flex-fill" onclick="backupData()">
+              <i class="fas fa-download me-2"></i>Backup Data
+            </button>
+            <input type="file" id="importFile" class="form-control" onchange="importData(event)" />
+        </div>
+      </div>
+    </div>
+  </section>
+  <section id="tabelData" class="container my-4">
+    <div class="card shadow">
+      <div class="card-header bg-info text-white">
+        <i class="fas fa-list me-2"></i>Daftar Catatan Kendaraan
+      </div>
+      <div class="card-body table-responsive">
+        <table class="table table-hover table-bordered text-center align-middle" id="tabelBerkas">
+          <thead class="table-light">
+            <tr>
+              <th>No</th><th>Tanggal</th><th>NRKB</th><th>Nama</th><th>No. BPKB</th>
+              <th>No. Rangka</th><th>Proses</th><th>Tgl PKB</th><th>Jumlah PKB</th>
+              <th>Checklist</th><th>Aksi</th>
+            </tr>
+          </thead>
+          <tbody><tr><td colspan="11">Belum ada catatan</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  <section id="rekapan" class="container my-4">
+    <div class="row text-center g-3">
+      <div class="col-md-4">
+        <div class="card shadow bg-primary text-white">
+          <div class="card-body"><h5>Minggu Ini</h5><h2 id="rekapMinggu">0</h2></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card shadow bg-success text-white">
+          <div class="card-body"><h5>Selesai</h5><h2 id="rekapSelesai">0</h2></div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card shadow bg-warning text-dark">
+          <div class="card-body">
+            <h5>Proses Terbanyak</h5>
+            <canvas id="chartProses" height="100"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="d-grid gap-2 my-4">
+      <button class="btn btn-warning" onclick="exportExcel()">
+        <i class="fas fa-file-export me-2"></i>Export ke Excel
+      </button>
+      <button class="btn btn-danger" onclick="showBelumSelesai()">
+        <i class="fas fa-exclamation-circle me-2"></i>Lihat Berkas Belum Selesai
+      </button>
+    </div>
+  </section>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="script.js"></script>
+  <script>if ('serviceWorker' in navigator) { navigator.serviceWorker.register('service-worker.js'); }</script>
+</body>
+</html>
