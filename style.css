@@ -2,16 +2,29 @@ body {
   background: #f1f5f9;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
+
 .card {
   border-radius: .8rem;
   transition: transform .3s ease;
 }
+
 .card:hover {
   transform: translateY(-2px);
 }
+
 .table th, .table td {
   vertical-align: middle;
 }
+
 .navbar .nav-link:hover {
   color: #ffd700 !important;
+}
+
+/* Tambahan styling */
+textarea.form-control {
+  resize: none;
+}
+
+#tabelPengurus th, #tabelPengurus td {
+  vertical-align: middle;
 }
