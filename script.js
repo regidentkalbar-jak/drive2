@@ -1,36 +1,52 @@
-// --- DATA ---
 let berkas = JSON.parse(localStorage.getItem("berkas")) || [];
+let pengurusData = JSON.parse(localStorage.getItem("pengurusData")) || [];
+
 const tbody = document.querySelector("#tabelBerkas tbody");
+const tbodyPengurus = document.querySelector("#tabelPengurus tbody");
 const rekapMinggu = document.getElementById("rekapMinggu");
 const rekapSelesai = document.getElementById("rekapSelesai");
+const pengurusSelect = document.getElementById("pengurus");
 let chart;
 
-// Input elements
-const nrkbInput = document.getElementById("nrkb");
-const jumlahPkbInput = document.getElementById("jumlahPkb");
+// ======== FORMAT TANGGAL (DD-MM-YYYY) ========
+function formatTanggal(tgl) {
+  if (!tgl) return "";
+  const d = new Date(tgl);
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+}
 
-// Validasi NRKB hanya huruf dan angka
-nrkbInput.addEventListener("input", function () {
-  this.value = this.value.replace(/[^a-zA-Z0-9 ]/g, "").toUpperCase();
+// ======== FORMAT RUPIAH ========
+function formatRupiah(angka) {
+  return angka.replace(/\D/g, "")
+    .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
+// ======== FORM ENTRI BERKAS ========
+document.getElementById("jumlahPkb").addEventListener("input", function () {
+  this.value = formatRupiah(this.value);
 });
 
-// Format PKB ribuan
-jumlahPkbInput.addEventListener("input", function () {
-  let value = this.value.replace(/\D/g, "");
-  this.value = value ? new Intl.NumberFormat("id-ID").format(value) : "";
+document.getElementById("pengurus").addEventListener("change", function () {
+  const selected = pengurusData.find(p => p.nama === this.value);
+  document.getElementById("noTelp").value = selected ? selected.telp : "";
 });
 
 document.getElementById("berkasForm").addEventListener("submit", function (e) {
   e.preventDefault();
-  const jumlahPkbNumeric = jumlahPkbInput.value.replace(/\./g, "").replace(/,/g, "");
   const data = {
     tanggalMasuk: tanggalMasuk.value,
-    nrkb: nrkbInput.value,
+    nrkb: nrkb.value,
     namaPemilik: namaPemilik.value,
     nomorRangka: nomorRangka.value,
     noBpkb: noBpkb.value,
     tanggalJatuhTempo: tanggalJatuhTempo.value,
-    jumlahPkb: jumlahPkbNumeric,
+    jumlahPkb: jumlahPkb.value,
+    pengurus: pengurus.value,
+    noTelp: noTelp.value,
+    catatan: catatan.value,
     proses: proses.value,
     checklist: defaultChecklist(proses.value),
     pengingat: Date.now() + 7 * 24 * 60 * 60 * 1000
@@ -40,66 +56,142 @@ document.getElementById("berkasForm").addEventListener("submit", function (e) {
   this.reset();
 });
 
+// ======== DEFAULT CHECKLIST ========
 function defaultChecklist(proses) {
   if (proses === "Perpanjangan STNK") return { stnk: false, tnkb: false };
   if (proses === "Mutasi Keluar") return { selesai: false };
   return { stnk: false, tnkb: false, bpkb: false };
 }
 
+// ======== SIMPAN DATA ========
 function saveData() {
   localStorage.setItem("berkas", JSON.stringify(berkas));
+  localStorage.setItem("pengurusData", JSON.stringify(pengurusData));
   renderTable();
+  renderPengurus();
   renderRekap();
 }
 
-function toggleChecklist(i, key) {
-  berkas[i].checklist[key] = !berkas[i].checklist[key];
-  saveData();
-}
-
+// ======== HAPUS DATA ========
 function hapusData(i) {
   if (confirm("Yakin ingin menghapus catatan ini?")) {
     berkas.splice(i, 1);
     saveData();
   }
 }
+function hapusPengurus(i) {
+  if (confirm("Hapus pengurus ini?")) {
+    pengurusData.splice(i, 1);
+    saveData();
+    updatePengurusSelect();
+  }
+}
 
+// ======== RENDER TABEL BERKAS ========
 function renderTable() {
   tbody.innerHTML = "";
   if (berkas.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="13">Belum ada catatan</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="14">Belum ada catatan</td></tr>`;
     return;
   }
   berkas.forEach((b, i) => {
-    const checklistHTML = Object.keys(b.checklist).map(
-      (k) => `<input type="checkbox" class="form-check-input me-1" ${b.checklist[k] ? "checked" : ""} onchange="toggleChecklist(${i}, '${k}')"> ${k.toUpperCase()}`
-    ).join("<br>");
+    const checklistHTML = Object.keys(b.checklist)
+      .map(
+        (k) =>
+          `<input type="checkbox" class="form-check-input me-1" ${
+            b.checklist[k] ? "checked" : ""
+          } onchange="toggleChecklist(${i}, '${k}')"> ${k.toUpperCase()}`
+      )
+      .join("<br>");
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${i + 1}</td>
-      <td>${b.tanggalMasuk}</td>
+      <td>${formatTanggal(b.tanggalMasuk)}</td>
       <td>${b.nrkb}</td>
       <td>${b.namaPemilik}</td>
       <td>${b.noBpkb}</td>
       <td>${b.nomorRangka}</td>
+      <td>${b.pengurus}</td>
+      <td>${b.noTelp}</td>
       <td>${b.proses}</td>
-      <td>${b.tanggalJatuhTempo}</td>
-      <td>Rp ${Number(b.jumlahPkb).toLocaleString()}</td>
+      <td>${formatTanggal(b.tanggalJatuhTempo)}</td>
+      <td>Rp ${b.jumlahPkb}</td>
+      <td>${b.catatan || "-"}</td>
       <td>${checklistHTML}</td>
-      <td><button class="btn btn-sm btn-danger" onclick="hapusData(${i})"><i class="fas fa-trash"></i></button></td>`;
+      <td>
+        <button class="btn btn-sm btn-danger" onclick="hapusData(${i})">
+          <i class="fas fa-trash"></i>
+        </button>
+      </td>
+    `;
     tbody.appendChild(tr);
   });
 }
 
+// ======== RENDER DATA MASTER ========
+document.getElementById("pengurusForm").addEventListener("submit", function (e) {
+  e.preventDefault();
+  const data = {
+    nama: namaPengurus.value,
+    telp: telpPengurus.value
+  };
+  pengurusData.push(data);
+  saveData();
+  this.reset();
+  updatePengurusSelect();
+});
+
+function renderPengurus() {
+  tbodyPengurus.innerHTML = "";
+  if (pengurusData.length === 0) {
+    tbodyPengurus.innerHTML = `<tr><td colspan="4">Belum ada data</td></tr>`;
+    return;
+  }
+  pengurusData.forEach((p, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${i + 1}</td>
+      <td>${p.nama}</td>
+      <td>${p.telp}</td>
+      <td><button class="btn btn-sm btn-danger" onclick="hapusPengurus(${i})"><i class="fas fa-trash"></i></button></td>
+    `;
+    tbodyPengurus.appendChild(tr);
+  });
+}
+function updatePengurusSelect() {
+  pengurusSelect.innerHTML = `<option value="">-- Pilih Pengurus --</option>`;
+  pengurusData.forEach((p) => {
+    const opt = document.createElement("option");
+    opt.value = p.nama;
+    opt.textContent = p.nama;
+    pengurusSelect.appendChild(opt);
+  });
+}
+
+// ======== CHECKLIST ========
+function toggleChecklist(i, key) {
+  berkas[i].checklist[key] = !berkas[i].checklist[key];
+  saveData();
+}
+
+// ======== REKAP ========
 function renderRekap() {
-  const mingguIni = berkas.filter((b) =>
-    new Date(b.tanggalMasuk) >= new Date(new Date().setDate(new Date().getDate() - 7))
+  const mingguIni = berkas.filter(
+    (b) =>
+      new Date(b.tanggalMasuk) >=
+      new Date(new Date().setDate(new Date().getDate() - 7))
   ).length;
-  const selesai = berkas.filter((b) => Object.values(b.checklist).every((v) => v)).length;
+  const selesai = berkas.filter((b) =>
+    Object.values(b.checklist).every((v) => v)
+  ).length;
+
   rekapMinggu.innerText = mingguIni;
   rekapSelesai.innerText = selesai;
+
   const prosesCount = {};
-  berkas.forEach((b) => { prosesCount[b.proses] = (prosesCount[b.proses] || 0) + 1; });
+  berkas.forEach((b) => {
+    prosesCount[b.proses] = (prosesCount[b.proses] || 0) + 1;
+  });
   drawChart(prosesCount);
 }
 
@@ -108,15 +200,14 @@ function drawChart(prosesCount) {
   if (chart) chart.destroy();
   chart = new Chart(ctx, {
     type: "pie",
-    data: { labels: Object.keys(prosesCount), datasets: [{ data: Object.values(prosesCount), backgroundColor: ["#0d6efd", "#198754", "#ffc107", "#dc3545", "#6f42c1"] }] }
+    data: {
+      labels: Object.keys(prosesCount),
+      datasets: [{ data: Object.values(prosesCount) }]
+    }
   });
 }
 
-function showBelumSelesai() {
-  const belum = berkas.filter((b) => !Object.values(b.checklist).every((v) => v));
-  alert(belum.length === 0 ? "Semua berkas sudah selesai." : "Berkas Belum Selesai:\n" + belum.map((b) => `${b.nrkb} - ${b.proses}`).join("\n"));
-}
-
+// ======== EXPORT EXCEL ========
 function exportExcel() {
   const ws = XLSX.utils.json_to_sheet(berkas);
   const wb = XLSX.utils.book_new();
@@ -124,50 +215,5 @@ function exportExcel() {
   XLSX.writeFile(wb, "berkas.xlsx");
 }
 
-setInterval(() => {
-  berkas.forEach((b) => {
-    if (Date.now() > b.pengingat && !Object.values(b.checklist).every((v) => v)) {
-      notify(`Pengingat: Berkas ${b.nrkb} belum selesai!`);
-      b.pengingat = Date.now() + 7 * 24 * 60 * 60 * 1000;
-    }
-  });
-  saveData();
-}, 60000);
-
-function notify(msg) {
-  if (Notification.permission === "granted") new Notification(msg);
-  else if (Notification.permission !== "denied") Notification.requestPermission().then((perm) => { if (perm === "granted") new Notification(msg); });
-}
-
-// Backup & Restore
-function backupData() {
-  const blob = new Blob([JSON.stringify(berkas)], { type: "application/json" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "backup_berkas.json";
-  a.click();
-}
-
-function importData(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (Array.isArray(data)) {
-        berkas = data;
-        saveData();
-        alert("Data berhasil diimpor!");
-      } else {
-        alert("Format file tidak sesuai!");
-      }
-    } catch (error) {
-      alert("Gagal membaca file!");
-    }
-  };
-  reader.readAsText(file);
-}
-
-renderTable();
-renderRekap();
+// ======== BELUM SELESAI ========
+function show
