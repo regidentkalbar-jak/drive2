@@ -1,3 +1,4 @@
+// data store
 let berkas = JSON.parse(localStorage.getItem("berkas")) || [];
 let pengurusData = JSON.parse(localStorage.getItem("pengurusData")) || [];
 
@@ -8,7 +9,7 @@ const rekapSelesai = document.getElementById("rekapSelesai");
 const pengurusSelect = document.getElementById("pengurus");
 let chart;
 
-// ======== FORMAT TANGGAL (DD-MM-YYYY) ========
+// helper: format tanggal (DD-MM-YYYY)
 function formatTanggal(tgl) {
   if (!tgl) return "";
   const d = new Date(tgl);
@@ -18,25 +19,36 @@ function formatTanggal(tgl) {
   return `${dd}-${mm}-${yyyy}`;
 }
 
-// ======== FORMAT RUPIAH ========
+// helper: format rupiah (adds . as thousands)
 function formatRupiah(angka) {
-  return angka.replace(/\D/g, "")
-    .replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return angka.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
 }
 
-// ======== FORM ENTRI BERKAS ========
+// init: apply rupiah formatter
 document.getElementById("jumlahPkb").addEventListener("input", function () {
   this.value = formatRupiah(this.value);
 });
 
+// when pengurus selection changes: set telp
 document.getElementById("pengurus").addEventListener("change", function () {
-  const selected = pengurusData.find(p => p.nama === this.value);
-  document.getElementById("noTelp").value = selected ? selected.telp : "";
+  const pid = this.value;
+  if (!pid) {
+    document.getElementById("noTelp").value = "";
+    return;
+  }
+  const p = pengurusData.find(x => x.id === pid);
+  document.getElementById("noTelp").value = p ? p.telp : "";
 });
 
+// handle berkas form submit
 document.getElementById("berkasForm").addEventListener("submit", function (e) {
   e.preventDefault();
+
+  const pengurusId = pengurus.value;
+  const pengurusObj = pengurusData.find(p => p.id === pengurusId) || {nama: pengurus.options[pengurus.selectedIndex]?.text || "", telp: document.getElementById("noTelp").value};
+
   const data = {
+    id: Date.now().toString(),
     tanggalMasuk: tanggalMasuk.value,
     nrkb: nrkb.value,
     namaPemilik: namaPemilik.value,
@@ -44,50 +56,59 @@ document.getElementById("berkasForm").addEventListener("submit", function (e) {
     noBpkb: noBpkb.value,
     tanggalJatuhTempo: tanggalJatuhTempo.value,
     jumlahPkb: jumlahPkb.value,
-    pengurus: pengurus.value,
-    noTelp: noTelp.value,
+    pengurusId: pengurusId || null,
+    pengurusNama: pengurusObj.nama,
+    pengurusTelp: pengurusObj.telp || document.getElementById("noTelp").value,
     catatan: catatan.value,
     proses: proses.value,
     checklist: defaultChecklist(proses.value),
     pengingat: Date.now() + 7 * 24 * 60 * 60 * 1000
   };
+
   berkas.push(data);
   saveData();
   this.reset();
+  // reset select to default
+  pengurusSelect.value = "";
+  document.getElementById("noTelp").value = "";
 });
 
-// ======== DEFAULT CHECKLIST ========
+// default checklist by proses
 function defaultChecklist(proses) {
   if (proses === "Perpanjangan STNK") return { stnk: false, tnkb: false };
   if (proses === "Mutasi Keluar") return { selesai: false };
   return { stnk: false, tnkb: false, bpkb: false };
 }
 
-// ======== SIMPAN DATA ========
+// save to localStorage + re-render
 function saveData() {
   localStorage.setItem("berkas", JSON.stringify(berkas));
   localStorage.setItem("pengurusData", JSON.stringify(pengurusData));
   renderTable();
   renderPengurus();
+  updatePengurusSelect();
   renderRekap();
 }
 
-// ======== HAPUS DATA ========
+// delete berkas
 function hapusData(i) {
   if (confirm("Yakin ingin menghapus catatan ini?")) {
     berkas.splice(i, 1);
     saveData();
   }
 }
+
+// delete pengurus
 function hapusPengurus(i) {
-  if (confirm("Hapus pengurus ini?")) {
+  const p = pengurusData[i];
+  if (!p) return;
+  if (confirm(`Hapus pengurus "${p.nama}"? (catatan lama tetap menyimpan nama dan telepon)`)) {
     pengurusData.splice(i, 1);
     saveData();
-    updatePengurusSelect();
   }
 }
 
-// ======== RENDER TABEL BERKAS ========
+// render table berkas
 function renderTable() {
   tbody.innerHTML = "";
   if (berkas.length === 0) {
@@ -96,13 +117,12 @@ function renderTable() {
   }
   berkas.forEach((b, i) => {
     const checklistHTML = Object.keys(b.checklist)
-      .map(
-        (k) =>
-          `<input type="checkbox" class="form-check-input me-1" ${
-            b.checklist[k] ? "checked" : ""
-          } onchange="toggleChecklist(${i}, '${k}')"> ${k.toUpperCase()}`
-      )
-      .join("<br>");
+      .map((k) =>
+        `<div class="form-check form-check-inline">
+           <input type="checkbox" class="form-check-input" ${b.checklist[k] ? "checked" : ""} onchange="toggleChecklist('${b.id}', '${k}')">
+           <label class="form-check-label">${k.toUpperCase()}</label>
+         </div>`
+      ).join("");
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${i + 1}</td>
@@ -111,36 +131,34 @@ function renderTable() {
       <td>${b.namaPemilik}</td>
       <td>${b.noBpkb}</td>
       <td>${b.nomorRangka}</td>
-      <td>${b.pengurus}</td>
-      <td>${b.noTelp}</td>
+      <td>${b.pengurusNama || "-"}</td>
+      <td>${b.pengurusTelp || "-"}</td>
       <td>${b.proses}</td>
       <td>${formatTanggal(b.tanggalJatuhTempo)}</td>
       <td>Rp ${b.jumlahPkb}</td>
       <td>${b.catatan || "-"}</td>
       <td>${checklistHTML}</td>
       <td>
-        <button class="btn btn-sm btn-danger" onclick="hapusData(${i})">
-          <i class="fas fa-trash"></i>
-        </button>
+        <button class="btn btn-sm btn-danger" onclick="hapusData(${i})"><i class="fas fa-trash"></i></button>
       </td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-// ======== RENDER DATA MASTER ========
+// render data master pengurus
 document.getElementById("pengurusForm").addEventListener("submit", function (e) {
   e.preventDefault();
-  const data = {
-    nama: namaPengurus.value,
-    telp: telpPengurus.value
-  };
-  pengurusData.push(data);
+  const nama = namaPengurus.value.trim();
+  const telp = telpPengurus.value.trim();
+  if (!nama || !telp) return alert("Isi nama dan telepon pengurus.");
+  const newP = { id: Date.now().toString(), nama, telp };
+  pengurusData.push(newP);
   saveData();
   this.reset();
-  updatePengurusSelect();
 });
 
+// render pengurus table
 function renderPengurus() {
   tbodyPengurus.innerHTML = "";
   if (pengurusData.length === 0) {
@@ -158,32 +176,33 @@ function renderPengurus() {
     tbodyPengurus.appendChild(tr);
   });
 }
+
+// update pengurus select (value=id; data-telp in option)
 function updatePengurusSelect() {
   pengurusSelect.innerHTML = `<option value="">-- Pilih Pengurus --</option>`;
   pengurusData.forEach((p) => {
     const opt = document.createElement("option");
-    opt.value = p.nama;
-    opt.textContent = p.nama;
+    opt.value = p.id;
+    opt.textContent = `${p.nama} (${p.telp})`;
+    opt.dataset.telp = p.telp;
     pengurusSelect.appendChild(opt);
   });
 }
 
-// ======== CHECKLIST ========
-function toggleChecklist(i, key) {
-  berkas[i].checklist[key] = !berkas[i].checklist[key];
+// toggle checklist by berkas id
+function toggleChecklist(berkasId, key) {
+  const idx = berkas.findIndex(b => b.id === berkasId);
+  if (idx === -1) return;
+  berkas[idx].checklist[key] = !berkas[idx].checklist[key];
   saveData();
 }
 
-// ======== REKAP ========
+// render rekap dan chart
 function renderRekap() {
   const mingguIni = berkas.filter(
-    (b) =>
-      new Date(b.tanggalMasuk) >=
-      new Date(new Date().setDate(new Date().getDate() - 7))
+    (b) => new Date(b.tanggalMasuk) >= new Date(new Date().setDate(new Date().getDate() - 7))
   ).length;
-  const selesai = berkas.filter((b) =>
-    Object.values(b.checklist).every((v) => v)
-  ).length;
+  const selesai = berkas.filter((b) => Object.values(b.checklist).length > 0 && Object.values(b.checklist).every(v => v)).length;
 
   rekapMinggu.innerText = mingguIni;
   rekapSelesai.innerText = selesai;
@@ -207,13 +226,35 @@ function drawChart(prosesCount) {
   });
 }
 
-// ======== EXPORT EXCEL ========
+// export ke excel (sheet lebih rapi)
 function exportExcel() {
-  const ws = XLSX.utils.json_to_sheet(berkas);
+  // map data to friendly columns
+  const dataForExcel = berkas.map(b => ({
+    Tanggal: formatTanggal(b.tanggalMasuk),
+    NRKB: b.nrkb,
+    NamaPemilik: b.namaPemilik,
+    NoBPKB: b.noBpkb,
+    NoRangka: b.nomorRangka,
+    PengurusNama: b.pengurusNama,
+    PengurusTelp: b.pengurusTelp,
+    Proses: b.proses,
+    TglPKB: formatTanggal(b.tanggalJatuhTempo),
+    JumlahPKB: b.jumlahPkb,
+    Catatan: b.catatan
+  }));
+  const ws = XLSX.utils.json_to_sheet(dataForExcel);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Berkas");
   XLSX.writeFile(wb, "berkas.xlsx");
 }
 
-// ======== BELUM SELESAI ========
-function show
+// show belum selesai (alert simple)
+function showBelumSelesai() {
+  const belum = berkas.filter(b => !(Object.values(b.checklist).length && Object.values(b.checklist).every(v => v)));
+  if (belum.length === 0) return alert("Semua berkas telah selesai.");
+  const list = belum.map(b => `${formatTanggal(b.tanggalMasuk)} - ${b.nrkb} - ${b.namaPemilik} (${b.proses})`).join("\n");
+  alert(`Berkas belum selesai:\n\n${list}`);
+}
+
+// initial render
+saveData();
